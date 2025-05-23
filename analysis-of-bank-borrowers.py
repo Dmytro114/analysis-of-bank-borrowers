@@ -1,7 +1,13 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-df = pd.read_csv('credit_default.csv')
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+file_path = r'D:\3 курс\python\5 seminar\credit_default.csv'
+df = pd.read_csv(file_path)
 df.head()
 df = df[(df['person_age'] <= 90) & (df['person_age'] >= 18)]
 df.info()
@@ -360,3 +366,55 @@ print(classification_report(y_test, y_pred_svm))
 #Найкраща загальна точність (91%).
 #Precision для боржників найвищий (93%), що означає найменшу кількість помилкових тривог.
 #Покращений F1-score порівняно з KNN і логістичною регресією.
+
+###Необхідно прийняти рішення щодо видачі кредиту для нових позичальників, інформація про яких знаходиться в файлі 'give_refuse_a_loan.csv': спрогнозувати значення цільової змінної,
+###використовуючи алгоритм, що має найвищу точність класифікації (отримали в п. 4).
+# 1. Завантаження даних
+df_train = pd.read_csv('credit_default.csv')
+df_predict = pd.read_csv('give_refuse_a_loan.csv')
+
+# 2. Цільова змінна
+y = df_train['loan_status']
+X = df_train.drop('loan_status', axis=1)
+
+# 3. Об'єднуємо для однакової обробки (train + predict)
+df_predict['loan_status'] = -1  # тимчасово, для об'єднання
+combined = pd.concat([X, df_predict], ignore_index=True)
+
+# 4. Перетворення категоріальних змінних
+combined = pd.get_dummies(combined, drop_first=True)
+
+# 5. Розділення назад
+X = combined[combined['loan_status'] != -1].drop('loan_status', axis=1)
+X_pred = combined[combined['loan_status'] == -1].drop('loan_status', axis=1)
+y = df_train['loan_status']
+
+# 6. Заповнення пропусків
+from sklearn.impute import SimpleImputer
+imputer = SimpleImputer(strategy='mean')
+X = imputer.fit_transform(X)
+X_pred = imputer.transform(X_pred)
+
+# 7. Масштабування
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+X_pred_scaled = scaler.transform(X_pred)
+
+# 8. Навчання моделі
+model = SVC()
+model.fit(X_scaled, y)
+
+# 9. Прогноз
+predictions = model.predict(X_pred_scaled)
+
+# 10. Результат
+df_result = df_predict.copy()
+df_result['predicted_loan_status'] = predictions
+print(df_result[['predicted_loan_status']].value_counts())
+
+y_pred = model.predict(X_pred_scaled)
+df_predict['predicted_loan_status'] = y_pred
+df_predict['predicted_loan_status'] = y_pred
+df_predict.to_csv('loan_predictions.csv', index=False)
+
+print(df_predict[['person_age', 'person_income', 'loan_amnt', 'loan_int_rate', 'predicted_loan_status']])
